@@ -317,17 +317,6 @@ export function fitCameraToBox(root, camera, controls) {
   controls.update();
 }
 
-/** 辅助函数：生成实体友好显示名称 */
-export function getEntityDisplayName(userData, blocks = {}) {
-  if (userData.name && blocks[userData.name]) {
-    return `${userData.type}-${userData.name}`;
-  }
-  if (userData.layer) {
-    return `${userData.type}-${userData.layer}`;
-  }
-  return `${userData.type}-${userData.id.slice(0, 6)}`; // 用id前6位避免重复
-}
-
 /** 辅助函数：生成实体唯一key */
 export function getEntityUniqueKey(userData) {
   // 组合type+layer+id，确保唯一不重复
@@ -355,4 +344,146 @@ export const isRedColorByHex = (colorDecimal) => {
 
   const colorHex = decimalToHexColor(colorDecimal);
   return colorHex === RED_HEX || colorHex === BLUE_HEX;
+};
+
+export function getEntityDisplayName(userData, blocks = {}) {
+  // 1) 属性文本
+  if (userData.attributes && Array.isArray(userData.attributes)) {
+    const t = userData.attributes.find((a) => a.text)?.text?.trim();
+    if (t) return t;
+  }
+  // 2) ATTDEF
+  if (userData.type === "INSERT" && userData.name && blocks[userData.name]?.entities) {
+    const attdef = blocks[userData.name].entities.find((e) => e.type === "ATTDEF" && e.text && e.text.trim());
+    if (attdef?.text) return attdef.text.trim();
+  }
+  // 3) 块名
+  if (userData.name) {
+    return userData.name.replace(/^\$/, "").replace(/\$/, " ").replace(/_/g, " ").trim();
+  }
+  return userData.type || "实体";
+}
+
+/** 优化：生成类别唯一Key（LWPOLYLINE包含颜色，其他类型保持原有逻辑） */
+export const getCategoryUniqueKey = (userData, name, color) => {
+  const colorHex = "#" + color.toString(16).padStart(6, "0");
+  // 对LWPOLYLINE/LINE，Key拼接颜色值；其他类型沿用原有逻辑
+  if (userData.type === "LWPOLYLINE" || userData.type === "LINE") {
+    return `${userData.type}:${name}:${colorHex}`;
+  }
+  return `${userData.type}:${name}`;
+};
+
+/** 判断字符串是否包含中文 */
+export const isContainChinese = (str) => {
+  if (!str) return false;
+  const chineseReg = /[\u4e00-\u9fa5]/;
+  return chineseReg.test(str);
+};
+
+// ====== 黄金色实线辅助框（Box3 -> 12条边 LineSegments） ======
+export const makeDashedBoxHelper = (obj) => {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return null;
+
+  const min = box.min;
+  const max = box.max;
+
+  const pts = [
+    // bottom
+    min.x,
+    min.y,
+    min.z,
+    max.x,
+    min.y,
+    min.z,
+    max.x,
+    min.y,
+    min.z,
+    max.x,
+    max.y,
+    min.z,
+    max.x,
+    max.y,
+    min.z,
+    min.x,
+    max.y,
+    min.z,
+    min.x,
+    max.y,
+    min.z,
+    min.x,
+    min.y,
+    min.z,
+
+    // top
+    min.x,
+    min.y,
+    max.z,
+    max.x,
+    min.y,
+    max.z,
+    max.x,
+    min.y,
+    max.z,
+    max.x,
+    max.y,
+    max.z,
+    max.x,
+    max.y,
+    max.z,
+    min.x,
+    max.y,
+    max.z,
+    min.x,
+    max.y,
+    max.z,
+    min.x,
+    min.y,
+    max.z,
+
+    // vertical
+    min.x,
+    min.y,
+    min.z,
+    min.x,
+    min.y,
+    max.z,
+    max.x,
+    min.y,
+    min.z,
+    max.x,
+    min.y,
+    max.z,
+    max.x,
+    max.y,
+    min.z,
+    max.x,
+    max.y,
+    max.z,
+    min.x,
+    max.y,
+    min.z,
+    min.x,
+    max.y,
+    max.z
+  ];
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+
+  // 黄金色（你也可以换成 0xffd700 / 0xd4af37）
+  const mat = new THREE.LineBasicMaterial({
+    color: 0xd4af37
+  });
+
+  const line = new THREE.LineSegments(geo, mat);
+
+  // 永远置顶显示（避免被 DXF 线挡住/闪烁）
+  line.renderOrder = 999999;
+  line.material.depthTest = false;
+  line.material.depthWrite = false;
+
+  line.userData.isHelper = true;
+  return line;
 };

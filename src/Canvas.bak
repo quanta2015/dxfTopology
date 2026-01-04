@@ -11,8 +11,7 @@ import {
   isRedColorByHex,
   getEntityDisplayName,
   getCategoryUniqueKey,
-  isContainChinese,
-  makeDashedBoxHelper
+  isContainChinese
 } from "./helper.js";
 
 // ====== 分组定义：4个集合（用于 radio），3个按钮控制显示 ======
@@ -25,7 +24,6 @@ const GROUPS = [
 
 export default function CanvasViewer({ mode = "fill", width = 1600, height = 900 }) {
   const mountRef = useRef(null);
-  const helperRootRef = useRef(null);
 
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -36,12 +34,18 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
   const animRef = useRef(0);
   const roRef = useRef(null);
 
+  // ✅ 原有逻辑：只在加载 DXF 时 fit 一次
   const fittedOnceRef = useRef(false);
 
   const [err, setErr] = useState("");
   const [dxfText, setDxfText] = useState("");
+  // ✅ 类别列表状态
   const [entityCategoryList, setEntityCategoryList] = useState([]);
+
+  // ✅ 新增：类别 -> 集合（4个 radio 归类）
   const [categoryGroupMap, setCategoryGroupMap] = useState(() => ({}));
+
+  // ✅ 新增：3个按钮控制显隐（配电箱+元件 / 电线 / 其他）
   const [groupVisibility, setGroupVisibility] = useState(() => ({
     main: true, // panel + component
     wire: true,
@@ -66,14 +70,8 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
       list.forEach((category) => {
         const groupKey = groupMap[category.key] || "other";
         const show = isGroupVisible(groupKey, vis);
-
         category.objects.forEach((obj) => {
           obj.visible = show;
-
-          // 同步 helper
-          if (obj.userData?.__boxHelper) {
-            obj.userData.__boxHelper.visible = show;
-          }
         });
       });
     },
@@ -203,12 +201,6 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
       window.removeEventListener("pointerup", onUp);
       renderer.domElement.removeEventListener("pointerdown", onDown);
 
-      if (helperRootRef.current) {
-        scene.remove(helperRootRef.current);
-        disposeObject(helperRootRef.current);
-        helperRootRef.current = null;
-      }
-
       if (dxfRootRef.current) {
         scene.remove(dxfRootRef.current);
         disposeObject(dxfRootRef.current);
@@ -250,18 +242,10 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
     const camera = cameraRef.current;
     const controls = controlsRef.current;
 
-    // 清理旧 root
     if (dxfRootRef.current) {
       scene.remove(dxfRootRef.current);
       disposeObject(dxfRootRef.current);
       dxfRootRef.current = null;
-    }
-
-    // 清理旧 helpers
-    if (helperRootRef.current) {
-      scene.remove(helperRootRef.current);
-      disposeObject(helperRootRef.current);
-      helperRootRef.current = null;
     }
 
     const parser = new DxfParser();
@@ -278,14 +262,12 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
       if (obj) root.add(obj);
     });
 
+    // ✅ 原有逻辑：将图形移到原点
     normalizeRootToOriginByLines(root);
     scene.add(root);
     dxfRootRef.current = root;
 
-    // 确保 matrixWorld 正确（Box3.setFromObject 需要）
-    root.updateWorldMatrix(true, true);
-
-    // ====== 1) 分类收集 ======
+    // ====== 分类收集数据（LWPOLYLINE/LINE按颜色细分） ======
     const entityStats = {};
     const dxfBlocks = blocks;
 
@@ -303,7 +285,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
             type: userData.type,
             blockName: userData.name || "N/A",
             layer: userData.layer || "N/A",
-            color,
+            color: color,
             objects: [],
             count: 0
           };
@@ -317,15 +299,20 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
     const newEntityCategoryList = Object.values(entityStats).sort((a, b) => b.count - a.count);
     setEntityCategoryList(newEntityCategoryList);
 
-    // ====== 2) 初始化分组映射 ======
+    // ====== 新逻辑：初始化“类别->集合”映射（4个 radio） ======
     const initialGroupMap = {};
     newEntityCategoryList.forEach((category) => {
+      // 默认：其他
       let g = "other";
 
       if ((category.type === "LINE" || category.type === "LWPOLYLINE") && isRedColorByHex(category.color)) {
         g = "wire";
       } else if (isContainChinese(category.name)) {
-        g = /配电箱/.test(category.name) ? "panel" : "component";
+        if (/配电箱/.test(category.name)) {
+          g = "panel";
+        } else {
+          g = "component";
+        }
       } else {
         g = "other";
       }
@@ -335,38 +322,10 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
 
     setCategoryGroupMap(initialGroupMap);
 
-    // ====== 3) 创建辅助框（仅 panel/component；wire/other 不创建） ======
-    const helperRoot = new THREE.Group();
-    helperRoot.name = "__helpers__";
-
-    // 再次确保 world matrix（某些 drawEntity 内部可能延迟更新）
-    root.updateWorldMatrix(true, true);
-
-    newEntityCategoryList.forEach((category) => {
-      const groupKey = initialGroupMap[category.key] || "other";
-      if (groupKey === "wire" || groupKey === "other") return;
-
-      category.objects.forEach((obj) => {
-        if (!obj?.userData?.isTopLevel) return;
-
-        const h = makeDashedBoxHelper(obj);
-        if (!h) return;
-
-        // 跟随对象显隐
-        h.visible = obj.visible;
-
-        obj.userData.__boxHelper = h;
-        helperRoot.add(h);
-      });
-    });
-
-    scene.add(helperRoot);
-    helperRootRef.current = helperRoot;
-
-    // ====== 4) 初始应用显隐（会同步 helper.visible） ======
+    // 初始按集合开关应用可见性（默认 main/wire/other 都 true => 全显示）
     applyVisibilityByGroups(newEntityCategoryList, initialGroupMap, groupVisibility);
 
-    // ====== 5) 适配相机 ======
+    // ✅ 原有逻辑：首次加载适配相机
     fittedOnceRef.current = false;
     if (!fittedOnceRef.current) {
       fitCameraToBox(root, camera, controls);
@@ -381,6 +340,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
         {err ? <div className="err">{err}</div> : null}
       </div>
 
+      {/* Detail区域（按类别显示 4个radio 归类 + 3个按钮控制显示） */}
       <div className="detail">
         <div className="dxf-detail-panel">
           <div className="detail-header">
@@ -409,6 +369,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
             </div>
           </div>
 
+          {/* 类别列表 */}
           <div className="entity-category-list">
             <div className="category-item">
               <div className="category-radios">
@@ -419,7 +380,6 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
               </div>
               <div className="category-label">名称</div>
             </div>
-
             {entityCategoryList.length === 0 ? (
               <div className="empty-tip">未找到可统计的DXF元素类别</div>
             ) : (
@@ -431,6 +391,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
 
                   return (
                     <div key={category.key} className="category-item">
+                      {/* 左侧：4个 radio */}
                       <div className="category-radios">
                         {GROUPS.map((g) => {
                           const radioId = `${category.key}__${g.key}`;
@@ -448,6 +409,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
                         })}
                       </div>
 
+                      {/* 右侧：类别信息 */}
                       <div className="category-label">
                         <div className="category-color" style={{ background: colorStr }}></div>
                         <div className="category-info">
