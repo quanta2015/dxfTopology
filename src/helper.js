@@ -351,6 +351,8 @@ const decimalToHexColor = (colorDecimal) => {
  */
 export const isRedColorByHex = (colorDecimal) => {
   const RED_HEX = "FF0000"; // 纯红色十六进制（大写）
+  const BLUE_HEX = "00FFFF"; // 纯蓝色十六进制（大写）
+
   const colorHex = decimalToHexColor(colorDecimal);
-  return colorHex === RED_HEX;
+  return colorHex === RED_HEX || colorHex === BLUE_HEX;
 };
