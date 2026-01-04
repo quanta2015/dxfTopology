@@ -1,0 +1,42 @@
+.canvas {
+  width: 100%;
+  height: 100%;
+  border: "1px solid #ddd";
+  border-radius: 8;
+  background: #111;
+}
+
+.canvas-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: #111;
+}
+
+.detail {
+  width: calc(100vw - 1250px);
+  height: 100vh;
+  overflow: scroll;
+  border-left: 1px solid #aaa;
+  padding: 5px;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.item-container {
+  border-radius: 8;
+
+  .item-title {
+    text-align: left;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 1px solid #999;
+  }
+
+  .item {
+    font-size: 8px;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+  }
+}

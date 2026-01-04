@@ -1,0 +1,88 @@
+.viewerRoot {
+  position: relative;
+}
+
+/* 固定大小：让容器只占 1600x900（或你传入的 width/height） */
+.viewerFixed {
+  display: inline-block; /* 不要撑满 */
+}
+
+/* 填满模式：如果你要铺满父容器才用 */
+.viewerFill {
+  width: 90vw;
+  height: 100vh;
+}
+
+.threeMount {
+  overflow: hidden;
+  background: #212121;
+}
+
+.err {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.detail {
+  width: 10vw;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  max-height: 100vh;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.entity-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.category-item {
+  display: flex;
+  gap: 5px;
+}
+
+.category-label {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+}
+
+.category-color {
+  width: 5px;
+}
+
+.category-info {
+  gap: 5px;
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+}
+
+.category-info i {
+  flex: 1;
+  white-space: nowrap; /* 不换行 */
+  overflow: hidden; /* 隐藏溢出内容 */
+  text-overflow: ellipsis; /* 显示省略号 */
+  margin-right: 2px;
+  font-style: normal;
+  text-align: left;
+  width: 90px;
+}

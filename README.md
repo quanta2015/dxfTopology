@@ -1,0 +1,7 @@
+EQUIP-照明
+EQUIP-动力
+EQUIP-插座
+
+EQUIP-箱柜
+
+WIRE-照明
