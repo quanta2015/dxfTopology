@@ -487,3 +487,117 @@ export const makeDashedBoxHelper = (obj) => {
   line.userData.isHelper = true;
   return line;
 };
+
+//  工具：从 wire 对象里提取世界坐标线段
+export const extractWorldSegments = (obj) => {
+  const segs = [];
+  obj.updateWorldMatrix(true, true);
+
+  obj.traverse((child) => {
+    if (!child.geometry || !child.geometry.attributes?.position) return;
+    if (!child.isLine && !child.isLineSegments) return;
+
+    const pos = child.geometry.attributes.position;
+    const idx = child.geometry.index;
+    const m = child.matrixWorld;
+
+    const readV = (i) => {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      return v.applyMatrix4(m);
+    };
+
+    // LineSegments：成对(0-1,2-3...)
+    const pushPairs = (indices) => {
+      for (let i = 0; i + 1 < indices.length; i += 2) {
+        const a = readV(indices[i]);
+        const b = readV(indices[i + 1]);
+        segs.push([a, b]);
+      }
+    };
+
+    // Line：相邻(0-1,1-2...)
+    const pushConsecutive = (indices) => {
+      for (let i = 0; i + 1 < indices.length; i += 1) {
+        const a = readV(indices[i]);
+        const b = readV(indices[i + 1]);
+        segs.push([a, b]);
+      }
+    };
+
+    if (idx) {
+      const indices = new Array(idx.count);
+      for (let i = 0; i < idx.count; i++) indices[i] = idx.getX(i);
+      if (child.isLineSegments) pushPairs(indices);
+      else pushConsecutive(indices);
+    } else {
+      const indices = new Array(pos.count);
+      for (let i = 0; i < pos.count; i++) indices[i] = i;
+      if (child.isLineSegments) pushPairs(indices);
+      else pushConsecutive(indices);
+    }
+  });
+
+  return segs;
+};
+
+//  工具：线段与 Box 相交（允许误差 s）
+export const segmentIntersectBox = (a, b, box, s) => {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  if (len < 1e-9) return null;
+
+  dir.multiplyScalar(1 / len);
+
+  const ray = new THREE.Ray(a, dir);
+  const expanded = box.clone().expandByScalar(s);
+
+  const hit = new THREE.Vector3();
+  const ok = ray.intersectBox(expanded, hit);
+  if (!ok) return null;
+
+  // 确保交点在线段范围内
+  const t = hit.clone().sub(a).dot(dir);
+  if (t < -s || t > len + s) return null;
+
+  return hit.clone();
+};
+
+//  工具：判定交点落在 box 的哪条“边/面”（用于“同一条边上”过滤）
+export const classifyContact = (p, box, s) => {
+  const candidates = [];
+
+  const dxMin = Math.abs(p.x - box.min.x);
+  const dxMax = Math.abs(p.x - box.max.x);
+  const dyMin = Math.abs(p.y - box.min.y);
+  const dyMax = Math.abs(p.y - box.max.y);
+  const dzMin = Math.abs(p.z - box.min.z);
+  const dzMax = Math.abs(p.z - box.max.z);
+
+  if (dxMin <= s) candidates.push("xmin");
+  if (dxMax <= s) candidates.push("xmax");
+  if (dyMin <= s) candidates.push("ymin");
+  if (dyMax <= s) candidates.push("ymax");
+  if (dzMin <= s) candidates.push("zmin");
+  if (dzMax <= s) candidates.push("zmax");
+
+  if (candidates.length === 0) return { kind: "unknown", key: "unknown" };
+
+  // 1个 => 在某个面上；2个 => 在某条边上；3个 => 在角上
+  const kind = candidates.length === 1 ? "face" : candidates.length === 2 ? "edge" : "corner";
+  const key = candidates.slice().sort().join("|");
+  return { kind, key };
+};
+
+//  工具：创建紫色连线
+export const makePurpleLink = (p1, p2) => {
+  const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  const mat = new THREE.LineBasicMaterial({ color: 0x8000ff });
+  const line = new THREE.Line(geo, mat);
+
+  line.renderOrder = 999998;
+  line.material.depthTest = false;
+  line.material.depthWrite = false;
+
+  line.userData.isWireLink = true;
+  return line;
+};
