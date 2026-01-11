@@ -9,7 +9,7 @@
 
 /* 填满模式：如果你要铺满父容器才用 */
 .viewerFill {
-  width: 80vw;
+  width: 70vw;
   height: 100vh;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .detail {
-  width: 20vw;
+  width: 30vw;
   padding: 10px;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
@@ -39,7 +39,7 @@
   overflow-y: scroll;
   overflow-x: hidden;
   box-sizing: border-box;
-  user-select: none;
+  // user-select: none;
 
   .menu {
     display: flex;
@@ -133,4 +133,70 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.dxf-router-panel {
+  padding: 12px;
+  color: #eaeaea;
+  overflow: auto;
+  gap: 5px;
+
+  .router-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .router-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border: 1px solid #444;
+
+      .router-group-title {
+        background: #333;
+        padding: 4px 6px;
+        font-weight: bold;
+        font-size: 13px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+
+        .router-title {
+          flex: 1;
+          text-align: left;
+        }
+
+        .router-group-count,
+        .router-group-sum {
+          font-weight: normal;
+          font-size: 12px;
+        }
+      }
+
+      .router-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 4px 6px;
+
+        .router-item {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          text-align: left;
+
+          .router-id {
+            flex: 1;
+            text-align: left;
+          }
+
+          i {
+            color: #ff8000;
+            text-align: right;
+            width: 60px;
+          }
+        }
+      }
+    }
+  }
 }

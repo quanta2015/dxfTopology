@@ -1,5 +1,77 @@
 import * as THREE from "three";
 
+// =======================
+// 全局容差（thread / 线宽误差）
+// =======================
+export const SEG_TOUCH_TOL = 2; // 你可以在外部统一改这里（世界坐标单位）
+
+// =======================
+// 2D 工具：线段-线段最短距离 + tol 判定（XY 投影）
+// =======================
+
+const EPS = 1e-12;
+const clamp01 = (t) => Math.max(0, Math.min(1, t));
+
+// 点到线段最短距离（2D）
+export const distPointToSeg2D = (p, a, b) => {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const apx = p.x - a.x;
+  const apy = p.y - a.y;
+
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 <= EPS) {
+    const dx = p.x - a.x;
+    const dy = p.y - a.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const t = clamp01((apx * abx + apy * aby) / ab2);
+  const cx = a.x + t * abx;
+  const cy = a.y + t * aby;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+// 线段-线段最短距离（2D）
+// 说明：在 2D 下，用“4 个端点到对方线段”的最小值，足够稳健地覆盖：
+// - 真正相交（距离≈0）
+// - 擦边/很近（距离小）
+// - 平行贴近（距离小）
+// - T 形接触（距离≈0）
+export const distSegSeg2D = (a, b, c, d) => {
+  const d1 = distPointToSeg2D(a, c, d);
+  const d2 = distPointToSeg2D(b, c, d);
+  const d3 = distPointToSeg2D(c, a, b);
+  const d4 = distPointToSeg2D(d, a, b);
+  return Math.min(d1, d2, d3, d4);
+};
+
+// bbox 粗筛（带 tol 扩张），用于加速
+export const bboxOverlap2D = (a, b, c, d, tol = SEG_TOUCH_TOL) => {
+  const minAx = Math.min(a.x, b.x) - tol;
+  const maxAx = Math.max(a.x, b.x) + tol;
+  const minAy = Math.min(a.y, b.y) - tol;
+  const maxAy = Math.max(a.y, b.y) + tol;
+
+  const minCx = Math.min(c.x, d.x) - tol;
+  const maxCx = Math.max(c.x, d.x) + tol;
+  const minCy = Math.min(c.y, d.y) - tol;
+  const maxCy = Math.max(c.y, d.y) + tol;
+
+  if (maxAx < minCx || maxCx < minAx) return false;
+  if (maxAy < minCy || maxCy < minAy) return false;
+  return true;
+};
+
+// ✅ 线段-线段“接触/连通”判定：最短距离 <= tol
+// 默认 tol 使用全局 SEG_TOUCH_TOL
+export const segsTouch2D = (a, b, c, d, tol = SEG_TOUCH_TOL) => {
+  if (!bboxOverlap2D(a, b, c, d, tol)) return false;
+  return distSegSeg2D(a, b, c, d) <= tol;
+};
+
 export function disposeObject(obj) {
   obj.traverse((child) => {
     if (child.geometry) child.geometry.dispose();
