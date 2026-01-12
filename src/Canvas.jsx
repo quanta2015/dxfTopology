@@ -376,7 +376,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
   };
 
   // 用容差把点做 hash（用于 wire-wire 端点连接）
-  const pointKey = (v, tol = 2) => {
+  const pointKey = (v, tol = 6) => {
     const x = Math.round(v.x / tol);
     const y = Math.round(v.y / tol);
     const z = Math.round(v.z / tol);
@@ -824,7 +824,7 @@ export default function CanvasViewer({ mode = "fill", width = 1600, height = 900
         nodeId.set(o.uuid, o.userData.__shortId || getShortId(o.uuid));
       });
 
-      const tol = 6;
+      const tol = 120;
 
       // --- component 紫线归并：ids + len ---
       const compPurpleIds = new Map(); // compUuid -> string[]
